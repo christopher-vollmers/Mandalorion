@@ -3,7 +3,7 @@
 [![MIT license](https://img.shields.io/badge/License-MIT-blue.svg)](http://perso.crans.org/besson/LICENSE.html)
 
 
-v4.5 - Somehow Isoform Returned
+v4.6 - Your isoforms are very impressive. You must be very proud.
 
 Takes R2C2/C3POa and/or PacBio/ccs/lima data and defines high confidence isoform consensus sequences and alignments.
 You can mix and match R2C2/PacBio reads and fasta/fastq files (quality scores are ignored).
@@ -28,7 +28,7 @@ python3 Mandalorion/utils/removePolyA.py -i input.5to3.fasta -o input.5to3.noPol
 
 after trimming adapters and polyA sequences:
 
-python3 Mandalorion/Mando.py -p ./ -g gencodeV29.gtf -G hg38.fasta -f input.5to3.noPolyA.fasta
+python3 Mandalorion/Mando.py -p ./ -g gencodeV29.gtf -G hg38.fasta -f input.5to3.noPolyA.fofn
 ```
 
 will generate 
@@ -96,13 +96,13 @@ Running with default settings:
 python3 Mando.py -p . -g gencodeV29.gtf -G hg38.fasta -f Consensus_reads.fofn
 ```
 
-.fofn file structure is simply a text file with one line per input fasta/fastq file.
+.fofn file structure is simply a text file with one line per input fasta/fastq file that contains the path to the file and a tab separated sample name.
 You can mix and match fasta/fastq files and gzipped and unzipped files.
 
 ```bash
-/path/to/file1.fasta
-/path/to/file2.fastq
-/path/to/file4.fastq.gz
+/path/to/file1.fasta	sample1
+/path/to/file2.fastq	sample2
+/path/to/file4.fastq.gz	sample1
 ```
 
 Here is a full list of options that you can use to modify Mandalorion behavior:
@@ -132,11 +132,8 @@ Here is a full list of options that you can use to modify Mandalorion behavior:
   -R MINIMUM_READS, --minimum_reads MINIMUM_READS
                         Minimum number of reads to make an isoform (default 3)
   -f CONSENSUS_READS, --Consensus_reads CONSENSUS_READS
-                        Fasta/fastq file with R2C2/PacBio consensus reads, can
-                        be entered as a single file path, a comma separated
-                        list of file paths, or a path to a file of filenames
-                        file (has to end on .fofn) that contains one file path
-                        per line
+                        Fasta/fastq file with R2C2/PacBio consensus reads, can be entered as a single file path, a comma separated list of file
+                        paths, or a path to a file of filenames file (has to end on .fofn) that contains one file path per line and a tab seprated sample name
   -O OVERHANGS, --overhangs OVERHANGS
                         Defines bounds for unaligned bases on ends. Format:
                         min5prime,max5prime,min3prime,max3prime (default

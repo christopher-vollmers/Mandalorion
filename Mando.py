@@ -57,7 +57,7 @@ parser.add_argument(
     help='''Fasta/fastq file with R2C2/PacBio consensus reads,
             can be entered as a single file path,
             a comma separated list of  file paths,
-            or a path to a file of filenames file (has to end on .fofn) that contains one file path per line'''
+            or a path to a file of filenames file (has to end on .fofn) that contains one file path per line and a tab separated sample name'''
 )
 
 parser.add_argument(
