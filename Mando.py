@@ -15,7 +15,7 @@ sys.path.append(os.path.abspath(PATH))
 import SpliceDefineConsensus
 
 
-VERSION = "v4.5.0 - Somehow Isoform Returned"
+VERSION = "v4.6.0 - Your isoforms are very impressive. You must be very proud."
 
 parser = argparse.ArgumentParser(usage='\n\nRunning with default parameters:\n\npython3 Mando.py -p . -g gencodeV29.gtf -G hg38.fasta -f Consensus_reads_noAdapters_noPolyA_5->3.fofn\n')
 
@@ -195,34 +195,34 @@ if 'A' in Modules:
            \n    Module A - Alignment\
            \n----------------------------\n')
     tempFasta=temp_path+'/Combined.fasta'
-
+    fastaInfo=temp_path+'/fastaFiles.info'
     print('\tchecking input fasta/q files')
     reads=False
-    if len(fastaList)==1:
-        print('\t1 fasta/q file provided')
+    print('\tcombining '+str(len(fastaList))+' input fasta/q files')
+    out=open(tempFasta,'w')
+    outInfo=open(fastaInfo,'w')
+    fileCounter=0
+    for fasta in fastaList:
+        fileCounter+=1
+
+        if len(fasta.split('\t'))==2:
+            fasta,id = fasta.split('\t')
+        else:
+            id=str(fileCounter)
         use_file=False
-        fasta=fastaList[0]
         if os.path.exists(fasta) and os.path.getsize(fasta)>0:
             use_file=True
         if use_file:
-            tempFasta=fastaList[0]
             reads=True
+            readCounter=0
+            for name,seq,qual in mp.fastx_read(fasta):
+                readCounter+=1
+                out.write(f'>{id}|{name}\n{seq}\n')
+            outInfo.write(f'{fasta}\t{id}\t{str(readCounter)}\n')
         else:
             print('\t',fasta, 'does not exist or is an empty file')
-    else:
-        print('\tcombining '+str(len(fastaList))+' input fasta/q files')
-        out=open(tempFasta,'w')
-        for fasta in fastaList:
-            use_file=False
-            if os.path.exists(fasta) and os.path.getsize(fasta)>0:
-                use_file=True
-            if use_file:
-                reads=True
-                for name,seq,qual in mp.fastx_read(fasta):
-                    out.write('>%s\n%s\n' %(name,seq))
-            else:
-                print('\t',fasta, 'does not exist or is an empty file')
-        out.close()
+    out.close()
+    outInfo.close()
     if reads:
         os.system(
             '%s -G 400k --secondary=no -ax splice:hq --cs=long -uf -t %s %s %s > %s '
@@ -242,14 +242,17 @@ if 'P' in Modules:
     input=False
     if os.path.exists(sam_file) and os.path.getsize(sam_file)>0:
         input=True
-
+    input=True
     if input:
         print('\tconverting sam output to psl format')
         os.system('python3 %s -i %s -o %s -m -t %s' % (emtrey, sam_file, psl_file,minimap2_threads))
+        os.system(f'rm {sam_file}')
         print('\tcleaning psl file of small Indels')
         SpliceDefineConsensus.clean_psl(psl_file, clean_psl_file,True)
+        os.system(f'rm {psl_file}')
         print('\tsorting clean psl file')
         os.system('sort -T %s -k 14,14 -k 16,17n %s > %s' %(temp_path,clean_psl_file,clean_sorted_psl_file))
+        os.system(f'rm {clean_psl_file}')
         print('\treading and splitting psl file into loci')
         if os.path.isdir(f'{temp_path}tmp_SS/'):
             os.system('rm -r %s/%s' % (temp_path,'tmp_SS/'))
@@ -268,14 +271,10 @@ if 'D' in Modules:
     if not os.path.exists(clean_sorted_psl_file) or os.path.getsize(clean_sorted_psl_file)==0:
         print('\tclean sorted psl file missing or empty')
         everything_present=False
-    for fasta_file in fastaList:
-        if not os.path.exists(fasta_file) or os.path.getsize(fasta_file)==0:
-            print('\t',fasta_file,'missing or empty')
-            everything_present=False
 
     if everything_present:
         os.system(
-            'python3 %s/defineIsoforms.py -i %s -p %s -c %s -g %s -w %s -m %s -W %s -n %s -j %s -u %s -d %s -a %s'
+            'python3 %s/defineIsoforms.py -i %s -p %s -c %s -g %s -w %s -m %s -W %s -n %s -j %s -u %s -d %s -a %s -M %s'
             % (
                 MandoPath,
                 clean_sorted_psl_file,
@@ -289,7 +288,8 @@ if 'D' in Modules:
                 junctions,
                 upstream_buffer,
                 downstream_buffer,
-                abpoa
+                abpoa,
+                minimum_reads
             )
         )
     else:
@@ -356,8 +356,8 @@ if 'Q' in Modules:
            \n    Module Q - quantifying isoforms\
            \n---------------------------------------\n')
     os.system(
-        'python3 %s/assignReadsToIsoforms.py -m %s -f %s'
-        % (MandoPath,temp_path, fasta_files)
+        'python3 %s/assignReadsToIsoforms.py -m %s'
+        % (MandoPath,temp_path)
     )
     os.system('scp ' + temp_path + '/*.quant ' + path)
     os.system('scp ' + temp_path + '/*.rpm ' + path)

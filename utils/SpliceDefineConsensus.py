@@ -539,7 +539,6 @@ def get_loci(infile,out_tmp,minCount):
                 loci=prune_locus(previous_start,previous_end,reads,minCount)
                 print(f'\t\tPreliminary locus {root} with {len(reads)} reads split into {len(loci)} final loci',' '*20,end='\r')
                 for root,root_reads in loci:
-#                    print(f'\t\t\t{root} {len(root_reads)}')
                     fh=open(out_tmp+'/'+root+'.psl', 'w')
                     roots.add(root)
 

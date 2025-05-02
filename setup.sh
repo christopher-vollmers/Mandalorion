@@ -6,7 +6,7 @@ cwd=$(pwd)
 # Resolve dependencies
 
 echo 'Pip installables (scipy, numpy, mappy, Cython)'
-python3 -m pip install --user --upgrade numpy mappy Cython
+python3 -m pip install --user --upgrade numpy mappy Cython matplotlib
 
 echo "minimap2"
 git clone https://github.com/lh3/minimap2

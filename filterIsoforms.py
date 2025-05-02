@@ -13,8 +13,7 @@ import multiprocessing as mtp
 PATH = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/utils/'
 sys.path.append(os.path.abspath(PATH))
 
-from SpliceDefineConsensus import clean_psl
-
+import SpliceDefineConsensus
 
 def argParser():
     parser = argparse.ArgumentParser(
@@ -122,7 +121,7 @@ def filter_isoforms(count, isoform_names, chromosome, psl_info, overhangs, minim
     return filtered_isoforms
 
 
-def look_for_contained_isoforms(isoform_list, chromosome, psl_dict, psl_info, chr_sequence,polyAWhiteList):
+def look_for_contained_isoforms(isoform_list, chromosome, psl_dict, psl_info, chr_sequence,polyAWhiteList,target_start):
     internal_buffer = 20
     filtered_isoforms = []
     covered = {}
@@ -153,11 +152,11 @@ def look_for_contained_isoforms(isoform_list, chromosome, psl_dict, psl_info, ch
         coordinates[-1] = max(coordinates[-1] - internal_buffer, coordinates[-2])
         direction = info[1]
         if direction == '+':
-            Acontent = chr_sequence[end:end + 15].upper().count('A') / 15
+            Acontent = chr_sequence[end-target_start:end-target_start + 15].upper().count('A') / 15
             polyArange = np.arange(end + 3, end + 23, 1)
             polyApos=end
         elif direction == '-':
-            Acontent = chr_sequence[start - 15:start].upper().count('T') / 15
+            Acontent = chr_sequence[start - 15 - target_start:start-target_start].upper().count('T') / 15
             polyArange = np.arange(start - 23, start - 3, 1)
             polyApos=start
         extend = set()
@@ -304,7 +303,7 @@ def simplify(infile, outfile, namefile):
     out1.close()
 
 
-def parse_clean_psl(psl_file, target_chromosome):
+def parse_clean_psl(psl_file):
     psl_dict = {}
     psl_info = {}
     isoform_list = []
@@ -313,9 +312,6 @@ def parse_clean_psl(psl_file, target_chromosome):
     for line in open(psl_file):
         a = line.strip().split('\t')
 
-        chromosome = a[13]
-        if chromosome != target_chromosome:
-            continue
         readstart = int(a[11])
         readend = int(a[12])
         readlength = readend - readstart
@@ -400,8 +396,10 @@ def write_isoforms(isoform_list, isoforms, psl_info):
         out2.write('>%s\n%s\n' % (isoform, sequence))
         out3.write('\t'.join(info) + '\n')
 
-def readWhiteList(polyA,chromosome):
+def readWhiteList(polyA,root):
 
+    chromosome,start,end=root.split('~')
+    start,end=int(start),int(end)
     WhiteList={}
     WhiteList['+']=set()
     WhiteList['-']=set()
@@ -409,8 +407,9 @@ def readWhiteList(polyA,chromosome):
     for line in open(polyA):
         a=line.strip().split('\t')
         if chromosome == a[0]:
-            for pos in np.arange(int(a[1]),int(a[2]),1):
-                WhiteList[a[5]].add(pos)
+            if start<int(a[1])<end or start<int(a[2])<end:
+                for pos in np.arange(int(a[1]),int(a[2]),1):
+                    WhiteList[a[5]].add(pos)
     return WhiteList
 
 
@@ -432,20 +431,22 @@ def filter_sam(sam_file,filtered_sam_file):
             out_sam.write(line)
     out_sam.close()
 
-def process_chr(chromosome,clean_psl_file,chr_sequence):
+def process_chr(root,clean_psl_file,chr_sequence):
         # currentChromosome+=1
-        print('\t\tprocessing chromosome',chromosome,' '*60, end='\r') #'('+str(currentChromosome)+'/'+numberOfChromosomes+')', ' '*60, end='\r')
-        sys.stderr.write(chromosome + '\n')
+        chromosome,start,end=root.split('~')
+        start,end=int(start),int(end)
+        print('\t\tprocessing locus',root,' '*60, end='\r') #'('+str(currentChromosome)+'/'+numberOfChromosomes+')', ' '*60, end='\r')
+        sys.stderr.write(root + '\n')
 #        print('reading polyA white list')
-        polyAWhiteList=readWhiteList(polyAWhiteListFile,chromosome)
+        polyAWhiteList=readWhiteList(polyAWhiteListFile,root)
 #        print('reading in isoforms and applying absolute filters for abundance, lengths, and overhangs')
-        psl_dict, psl_info, isoform_list = parse_clean_psl(clean_psl_file, chromosome)
+        psl_dict, psl_info, isoform_list = parse_clean_psl(clean_psl_file)
 #        print('getting isoform loci read counts')
-        count = get_count(isoform_list, chromosome, psl_dict)
+        count = get_count(isoform_list,chromosome, psl_dict)
 #        print('filtering isoforms for relative read coverage starting with', len(isoform_list), 'isoforms')
         isoform_list = filter_isoforms(count, isoform_list, chromosome, psl_info, overhangs, minimum_isoform_length)
 #        print('finding fully contained isoforms in', len(isoform_list), 'remaining isoforms')
-        isoform_list = look_for_contained_isoforms(isoform_list, chromosome, psl_dict, psl_info, chr_sequence,polyAWhiteList)
+        isoform_list = look_for_contained_isoforms(isoform_list, chromosome, psl_dict, psl_info, chr_sequence,polyAWhiteList,start)
 #        print('writing', len(isoform_list), 'isoforms to file')
         return isoform_list,psl_info
 
@@ -459,27 +460,38 @@ def main(infile):
     filtered_sam_file = path + '/Isoforms.aligned.out.filtered.sam'
     psl_file = path + '/Isoforms.aligned.out.psl'
     clean_psl_file = path + '/Isoforms.aligned.out.clean.psl'
+    clean_sorted_psl_file = path + '/Isoforms.aligned.out.clean.sorted.psl'
     os.system('%s -G 400k -uf --secondary=no -ax splice:hq -t %s %s %s > %s ' % (minimap2, minimap2_threads, genome, processed_isoforms, sam_file))
     filter_sam(sam_file,filtered_sam_file)
     os.system('python3 %s -i %s -o %s -t %s' % (emtrey, filtered_sam_file, psl_file,minimap2_threads))
-    clean_psl(psl_file, clean_psl_file,False)
-    print('\tcollecting chromosomes'+' '*40)
-    chromosomes = collect_chromosomes(clean_psl_file)
-    numberOfChromosomes=str(len(chromosomes))
-    currentChromosome=0
+    SpliceDefineConsensus.clean_psl(psl_file, clean_psl_file,False)
+    os.system('sort -T %s -k 14,14 -k 16,17n %s > %s' %(path,clean_psl_file,clean_sorted_psl_file))
+
+    tmp_path=f'{path}/tmp_isos/'
+    print('\treading and splitting isoform psl file into loci')
+    if os.path.isdir(tmp_path):
+        os.system(f'rm -r {tmp_path}')
+    os.system(f'mkdir {tmp_path}')
+    SpliceDefineConsensus.get_loci(clean_sorted_psl_file,tmp_path,1)
+
+    print('\tcollecting loci')
+    chrom_list,roots = SpliceDefineConsensus.get_parsed_files(tmp_path,set())
+    roots=sorted(list(roots),key=lambda x: (x.split('~')[0],int(x.split('~')[1])))
 
     pool=mtp.Pool(processes=int(minimap2_threads))
     results={}
-    for chromosome in chromosomes:
-        results[chromosome]=pool.apply_async(process_chr,[chromosome,clean_psl_file,genome_sequence[chromosome]])
+    for root in roots:
+        chromosome,start,end=root.split('~')
+        start,end=int(start),int(end)
+        results[root]=pool.apply_async(process_chr,[root,tmp_path+'/'+root+'.psl',genome_sequence[chromosome][start:end]])
         # isoform_list,psl_info=pool.apply_async(process_chr,[chromosome,clean_psl_file,genome_sequence]).get()
 
 
 
     pool.close()
     pool.join()
-    for chromosome in chromosomes:
-       isoform_list,psl_info=results[chromosome].get()
+    for root in roots:
+       isoform_list,psl_info=results[root].get()
        write_isoforms(isoform_list, isoforms, psl_info)
 
 #    print('converting psl output to gtf output')

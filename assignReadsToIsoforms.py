@@ -5,13 +5,11 @@ import numpy as np
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-m', '--mandalorion_output_folder', type=str)
-parser.add_argument('-f', '--fasta_files', type=str, help='comma separate list of fasta file locations')
-
 
 
 args = parser.parse_args()
 mandalorion_folder=args.mandalorion_output_folder
-fasta_files=args.fasta_files
+fastaInfo=mandalorion_folder+'/fastaFiles.info'
 filtered_isoforms=mandalorion_folder+'/Isoforms.filtered.clean.psl'
 gene_file=mandalorion_folder+'/Isoforms.filtered.clean.genes'
 r2i=mandalorion_folder+'/reads2isoforms.txt'
@@ -93,7 +91,7 @@ def get_features(filtered_isoforms):
 
     return isoJunctions,isoStarts,isoEnds
 
-def read_filtered_isoforms(filtered_isoforms,r2i_dict,sampleList,readMapDict,isoformReadCounts,totalReadCounts,geneDict):
+def read_filtered_isoforms(filtered_isoforms,r2i_dict,sampleList,isoformReadCounts,totalReadCounts,geneDict):
     isoJunctions,isoStarts,isoEnds = get_features(filtered_isoforms)
     juncDict={}
     startDict={}
@@ -109,7 +107,7 @@ def read_filtered_isoforms(filtered_isoforms,r2i_dict,sampleList,readMapDict,iso
             for sample in sampleList:
                 geneQuant[gene][sample]=0
         for name in r2i_dict[isoform]:
-            sample=readMapDict[name]
+            sample=name.split('|')[0]
             geneQuant[gene][sample]+=1
 
     start2gene={}
@@ -148,7 +146,7 @@ def read_filtered_isoforms(filtered_isoforms,r2i_dict,sampleList,readMapDict,iso
                 endDict[end][sample]=0
 
         for name in r2i_dict[isoform]:
-            sample=readMapDict[name]
+            sample=name.split('|')[0]
             quantDict[sample]+=1
 
             endDict[end][sample]+=1
@@ -162,7 +160,11 @@ def read_filtered_isoforms(filtered_isoforms,r2i_dict,sampleList,readMapDict,iso
         outfrac.write(a[9]+'\t'+gene+'\t')
         for sample in sampleList:
             value=quantDict[sample]
-            isoformReads=isoformReadCounts[sample]
+            if sample in isoformReadCounts:
+                isoformReads=isoformReadCounts[sample]
+            else:
+                isoformReads=0
+
             geneReads=geneQuant[gene][sample]
             totalReads=totalReadCounts[sample]
             outq.write(str(value)+'\t')
@@ -235,42 +237,40 @@ def read_filtered_isoforms(filtered_isoforms,r2i_dict,sampleList,readMapDict,iso
 
 
 
-def mapReadLocation(fastaList):
-    sampleList=[]
-    readMapDict={}
+def mapReadLocation(fastaInfo):
+    sampleSet=set()
     totalReadCounts={}
-    for line in fastaList:
-        location=line.strip()
-        totalReadCounts[location]=0
-        sampleList.append(location)
-        reads=read_fasta(location)
-        for name,seq,qual in mp.fastx_read(location):
-            readMapDict[name]=location
-            totalReadCounts[location]+=1
+    for line in open(fastaInfo):
+        fastaFile,id,readCount=line.strip().split('\t')
+        readCount=int(readCount)
+        sampleSet.add(id)
+        if id not in totalReadCounts:
+            totalReadCounts[id]=0
+        totalReadCounts[id]+=readCount
 
     for outFile in (outq,outtpm,outfrac):
         outFile.write('Isoform\tGene\t')
     for outFile in (outStartQ,outStartTpm,outStartFrac,outEndQ,outEndTpm,outEndFrac,outJunctionQ,outJunctionTpm,outJunctionFrac):
        outFile.write('Chr\tStart\tEnd\tName\tScore\tDirection\tGene\t')
 
-
+    sampleList=list(sampleSet)
     for sample in sampleList:
         for outFile in (outq,outtpm,outfrac,outStartQ,outStartTpm,outStartFrac,outEndQ,outEndTpm,outEndFrac,outJunctionQ,outJunctionTpm,outJunctionFrac):
             outFile.write(sample+'\t')
     for outFile in (outq,outtpm,outfrac,outStartQ,outStartTpm,outStartFrac,outEndQ,outEndTpm,outEndFrac,outJunctionQ,outJunctionTpm,outJunctionFrac):
         outFile.write('\n')
 
-    return sampleList,readMapDict,totalReadCounts
+    return sampleList,totalReadCounts
 
 
-def read_r2i(r2i,readMapDict):
+def read_r2i(r2i):
     r2i_dict={}
     isoformReadCounts={}
     for line in open(r2i):
         a=line.strip().split('\t')
         read=a[0]
         isoform=a[1]
-        location=readMapDict[read]
+        location=read.split('|')[0]
         if location not in isoformReadCounts:
             isoformReadCounts[location]=0
         if isoform not in r2i_dict:
@@ -293,22 +293,13 @@ def getGenes(gene_file):
             geneDict[isoform]=gene
     return geneDict,genes
 
-if '.fofn' in fasta_files:
-    fastaList=[]
-    for line in open(fasta_files):
-        fasta=line.strip()
-        fastaList.append(fasta)
-else:
-    fastaList=fasta_files.split(',')
-
-
 
 
 print('\tassigning isoforms to genes')
 geneDict,genes=getGenes(gene_file)
 print('\tmap reads to samples')
-sampleList,readMapDict,totalReadCounts=mapReadLocation(fastaList)
+sampleList,totalReadCounts=mapReadLocation(fastaInfo)
 print('\tmap reads to isoforms')
-r2i_dict,isoformReadCounts=read_r2i(r2i,readMapDict)
+r2i_dict,isoformReadCounts=read_r2i(r2i)
 print('\tquantify isoforms and isoform features')
-read_filtered_isoforms(filtered_isoforms,r2i_dict,sampleList,readMapDict,isoformReadCounts,totalReadCounts,geneDict)
+read_filtered_isoforms(filtered_isoforms,r2i_dict,sampleList,isoformReadCounts,totalReadCounts,geneDict)
