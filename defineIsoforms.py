@@ -247,8 +247,19 @@ def main():
             consensus,names = IsoData[isoform]
             nameString='Isoform'+str(counter)+'_'+str(len(names))
             out.write(f'>{nameString}\n{consensus}\n')
+            sampleDict={}
+            for sample in samples:
+                sampleDict[sample]=0
             for name in names:
+                sample=name.split('|')[0]
+                sampleDict[sample]+=1
                 out_r2i.write(f'{name}\t{nameString}\n')
+            sampleCounts=[]
+            for sample in samples:
+                sampleCount=str(sampleDict[sample])
+                sampleCounts.append(sampleCount)
+            out_i2s.write(f'{nameString}\t'+'\t'.join(sampleCounts)+'\n')
+
         results.pop(root)
 
 

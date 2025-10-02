@@ -541,7 +541,6 @@ def get_loci(infile,out_tmp,minCount):
                 for root,root_reads in loci:
                     fh=open(out_tmp+'/'+root+'.psl', 'w')
                     roots.add(root)
-
                     for read in root_reads:
                         fh.write(read)
                         total_psl+=1
@@ -559,10 +558,10 @@ def get_loci(infile,out_tmp,minCount):
         for root,root_reads in loci:
             fh=open(out_tmp+'/'+root+'.psl', 'w')
             roots.add(root)
-            for line in reads:
+            for read in root_reads:
                 total_psl+=1
-                fh.write(line)
-                name=line.strip().split('\t')[9]
+                fh.write(read)
+                name=read.strip().split('\t')[9]
                 outDict[name]=root
             fh.close()
 
