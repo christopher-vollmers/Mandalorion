@@ -1,3 +1,6 @@
+## [IG-28]([https://github.com](https://github.com/christopher-vollmers/IG28)) has replaced Mandalorion. Unless you rely on Mandalorion to create read based isoform consensus sequences please consider switching to IG-28. We'll put maintenance of this repo on the backburner.
+
+
 # Mandalorion #
 [![Github release](https://img.shields.io/github/tag/christopher-vollmers/Mandalorion-1.svg?label=Version)](https://github.com/christopher-vollmers/Mandalorion-1/tags)
 [![MIT license](https://img.shields.io/badge/License-MIT-blue.svg)](http://perso.crans.org/besson/LICENSE.html)
